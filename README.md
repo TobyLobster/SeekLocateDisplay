@@ -56,6 +56,7 @@ const SeekLocateDisplay = require('./seek_locate_display.js');
 ```html
 <script src="seek_locate_display.js"></script>
 <script>
+document.addEventListener('DOMContentLoaded', function () {
   const sld = new SeekLocateDisplay({
     container: '#my-search',
     pages: [
@@ -76,6 +77,7 @@ const SeekLocateDisplay = require('./seek_locate_display.js');
       }
     ]
   });
+}); // end DOMContentLoaded
 </script>
 ```
 
