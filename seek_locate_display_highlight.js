@@ -14,7 +14,10 @@
  *      If the section has no match inside it, stay at the section itself
  *      rather than jumping elsewhere. With no #section anchor at all,
  *      falls back to the first match on the whole page.
- *   5. Clean the param from the URL afterwards (keeps URLs tidy on reload)
+ *   5. Optionally remove the param from the URL afterwards — only when
+ *      { cleanUrl: true } is set. By default (cleanUrl: false) the param
+ *      is left in place, so reloading the page or returning to it via
+ *      the back button re-applies the highlights.
  *
  * Usage — just before </body>:
  *   <script src="seeklocatedisplay-highlight.js"></script>
@@ -43,7 +46,7 @@
     scroll: true,           // auto-scroll to the first match
     scrollBehavior: 'smooth',
     scrollOffset: 80,        // px gap above the highlighted match (sticky headers etc.)
-    cleanUrl: false,          // don't strip the param from the URL after highlighting (true keeps history clean)
+    cleanUrl: false,          // leave the param in the URL so reload/back re-highlights; set true to strip it (tidier URLs, but highlights are lost on reload)
     markClassName: 'ls-page-highlight',
     activeClassName: 'ls-page-highlight-active', // applied to the first/scrolled-to match
     skipTags: ['script', 'style', 'noscript', 'textarea', 'input', 'select', 'option', 'svg', 'mark', 'mjx-container'],
@@ -345,13 +348,28 @@
   }
 
   function getSectionElement() {
-    const hash = window.location.hash.slice(1);
-    if (!hash) return null;
+    const raw = window.location.hash.slice(1);
+    if (!raw) return null;
+    // SeekLocateDisplay percent-encodes section ids when building result
+    // URLs (ids can contain spaces, '%', '&', …), and browsers themselves
+    // try both the raw and percent-decoded forms when jumping to a
+    // fragment — so we must do the same here or encoded ids never match.
+    const candidates = [raw];
     try {
-      return document.getElementById(hash) || document.querySelector(`[name="${CSS.escape(hash)}"]`);
-    } catch (e) {
-      return document.getElementById(hash);
+      const decoded = decodeURIComponent(raw);
+      if (decoded !== raw) candidates.push(decoded);
+    } catch (e) { /* malformed escape sequence — just use the raw form */ }
+
+    for (const hash of candidates) {
+      let el = document.getElementById(hash);
+      if (!el) {
+        try {
+          el = document.querySelector(`[name="${CSS.escape(hash)}"]`);
+        } catch (e) { /* CSS.escape unavailable — getElementById already tried */ }
+      }
+      if (el) return el;
     }
+    return null;
   }
 
   /**
@@ -383,14 +401,81 @@
     return { type: 'section', el: section };
   }
 
-  function scrollToTarget(target) {
+  /**
+   * Scroll to the chosen target once layout has settled.
+   *
+   * The previous version measured getBoundingClientRect() one frame
+   * after DOMContentLoaded and scrolled to that Y. Anything that shifts
+   * layout after that point — images without explicit dimensions, web
+   * fonts swapping in, MathJax typesetting — moves the content and the
+   * scroll lands in the wrong place. (This is the same early-measurement
+   * bug the search library's _restoreScroll was rewritten to avoid.)
+   *
+   * Instead: the active-mark class is applied immediately (it should be
+   * visible regardless of scrolling), then we poll each frame until the
+   * target's document position AND the document height have been stable
+   * for a few consecutive frames — or a max wait elapses — and only then
+   * measure and scroll, once. If the user starts scrolling before we do,
+   * we abort entirely rather than yank the page away from them.
+   */
+  function scrollToTargetWhenSettled(target) {
     if (!target || !target.el) return;
+
     if (target.type === 'mark') {
       target.el.classList.add(opts.activeClassName);
     }
-    const rect = target.el.getBoundingClientRect();
-    const targetY = window.scrollY + rect.top - opts.scrollOffset;
-    window.scrollTo({ top: Math.max(0, targetY), behavior: opts.scrollBehavior });
+
+    const maxWaitMs = 1500;
+    const stableFramesNeeded = 3;
+    const startedAt = Date.now();
+
+    let cancelled = false;
+    const onUserScroll = () => {
+      cancelled = true;
+      removeAbortListeners();
+    };
+    function removeAbortListeners() {
+      window.removeEventListener('wheel', onUserScroll);
+      window.removeEventListener('touchmove', onUserScroll);
+    }
+    window.addEventListener('wheel', onUserScroll, { passive: true });
+    window.addEventListener('touchmove', onUserScroll, { passive: true });
+
+    let lastTop = null;
+    let lastHeight = null;
+    let stableFrames = 0;
+
+    const doScroll = () => {
+      removeAbortListeners();
+      const rect = target.el.getBoundingClientRect();
+      const targetY = window.scrollY + rect.top - opts.scrollOffset;
+      window.scrollTo({ top: Math.max(0, targetY), behavior: opts.scrollBehavior });
+    };
+
+    const check = () => {
+      if (cancelled) return;
+      const rect = target.el.getBoundingClientRect();
+      const top = rect.top + window.scrollY; // document-space position
+      const height = document.documentElement.scrollHeight;
+
+      if (top === lastTop && height === lastHeight) {
+        stableFrames++;
+      } else {
+        stableFrames = 0;
+      }
+      lastTop = top;
+      lastHeight = height;
+
+      if (stableFrames >= stableFramesNeeded || Date.now() - startedAt >= maxWaitMs) {
+        doScroll();
+        return;
+      }
+      requestAnimationFrame(check);
+    };
+
+    // Starting on the next frame also lets the browser's own native
+    // #anchor jump (if any) happen first; we then refine on top of it.
+    requestAnimationFrame(check);
   }
 
   function cleanUrlParam(paramName) {
@@ -440,9 +525,7 @@
 
     if (opts.scroll) {
       const target = pickScrollTarget(marks);
-      // Wait a frame so the browser's own native #anchor jump (if any)
-      // has already happened; we then correct/refine on top of it.
-      requestAnimationFrame(() => scrollToTarget(target));
+      scrollToTargetWhenSettled(target);
     }
 
     if (opts.cleanUrl) cleanUrlParam(opts.param);

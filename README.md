@@ -1,5 +1,7 @@
 # SeekLocateDisplay
 
+![Title](seek.jpg)
+
 A zero-dependency, full-text search library for local HTML pages. Drop it into any static site to get instant, client-side search with no backend, no build step, and no external services.
 
 - **Indexes your content** — sections grouped by page, weighted by heading vs. body

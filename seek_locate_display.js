@@ -131,8 +131,17 @@
 
   /* ─── Helpers ───────────────────────────────────────────────── */
 
+  /**
+   * Escape for BOTH element-content and attribute-value contexts.
+   * Quote escaping matters: renderResults interpolates escaped strings
+   * into data-dest="..." and aria-label="..." attributes, and a heading
+   * or URL containing `"` would otherwise break out of the attribute —
+   * a robustness bug with author data, an XSS vector the moment page /
+   * section content is ever derived from user-generated input.
+   */
   function escapeHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
   /** Apply <mark> tags around a sorted list of {start,end} spans in escaped HTML */
@@ -162,10 +171,15 @@
 
   function debounce(fn, ms) {
     let timer;
-    return function (...args) {
+    const debounced = function (...args) {
       clearTimeout(timer);
       timer = setTimeout(() => fn.apply(this, args), ms);
     };
+    // Allow callers to drop a pending invocation — used to stop a
+    // debounced URL write from firing after the query was cleared or
+    // after navigation already wrote the final value synchronously.
+    debounced.cancel = () => clearTimeout(timer);
+    return debounced;
   }
 
   function injectStyles(css) {
@@ -424,12 +438,30 @@
    * everything after # is not part of the query string.
    */
   function buildDestUrl(pageUrl, sectionId, rawQuery, opts) {
-    let base = pageUrl;
+    // Split off any fragment already present in the configured page URL.
+    // Query params must be inserted BEFORE the '#' — checking only for
+    // '?' meant a config like url:'guide.html#top' produced
+    // 'guide.html#top?ls-hl=...#id', burying the param inside the
+    // fragment where the destination page's highlighter never sees it.
+    const hashIdx = pageUrl.indexOf('#');
+    let base = hashIdx === -1 ? pageUrl : pageUrl.slice(0, hashIdx);
+    const existingHash = hashIdx === -1 ? '' : pageUrl.slice(hashIdx + 1);
+
     if (opts.highlightOnNavigate && rawQuery) {
       const sep = base.includes('?') ? '&' : '?';
       base += sep + opts.highlightParam + '=' + encodeURIComponent(rawQuery);
     }
-    if (sectionId) base += '#' + sectionId;
+
+    // The section id is encoded (ids containing spaces, '%', '&' etc.
+    // would otherwise produce a malformed fragment). A hash embedded in
+    // the configured URL is passed through untouched — it may already be
+    // encoded, and re-encoding would corrupt it. When both exist the
+    // sectionId wins, being the more specific target.
+    if (sectionId) {
+      base += '#' + encodeURIComponent(sectionId);
+    } else if (existingHash) {
+      base += '#' + existingHash;
+    }
     return base;
   }
 
@@ -551,19 +583,25 @@
 
     const doSearch = debounce((q) => this._runSearch(q), opts.debounceMs);
 
+    // URL writes get their own (shorter) debounce, separate from the
+    // search debounce. Writing on EVERY keystroke looks cheap but runs
+    // into Safari's rate limit on history.replaceState (~100 calls per
+    // 30 seconds): past the limit Safari throws, writeQueryParam's
+    // try/catch swallows it, and the URL silently stops tracking the
+    // query. The race the per-keystroke write originally guarded
+    // against — clicking a result before the write fires, leaving the
+    // URL without ?q= — is covered by _navigate(), which cancels any
+    // pending write and writes the final value synchronously before
+    // leaving the page.
+    this._writeQuery = debounce((q) => {
+      if (opts.persist) writeQueryParam(opts.persistParam, q);
+    }, 300);
+
     this._input.addEventListener('input', () => {
       const q = this._input.value;
       this._clearBtn.style.display = q ? 'block' : 'none';
 
-      // Write the URL param immediately, NOT debounced. This was
-      // previously tied to the same debounce as re-running search, which
-      // created a race: clicking a result shortly after typing (well
-      // within normal typing-then-clicking speed) could navigate away
-      // before the debounced write ever fired, leaving the URL without
-      // ?q=... and making the search box appear empty after Back. The
-      // search re-render is comparatively expensive and fine to debounce;
-      // writing a query string is cheap and should happen every keystroke.
-      if (opts.persist) writeQueryParam(opts.persistParam, q);
+      if (opts.persist) this._writeQuery(q);
 
       if (q.length < opts.minChars && q.length > 0) {
         this._results.innerHTML = '';
@@ -577,7 +615,13 @@
       this._clearBtn.style.display = 'none';
       this._results.innerHTML = '';
       this._input.focus();
-      if (opts.persist) writeQueryParam(opts.persistParam, '');
+      if (opts.persist) {
+        // Cancel any write still pending from typing — without this, a
+        // debounced write of the just-cleared text could fire ~300ms
+        // AFTER we remove the param, resurrecting a stale ?q= value.
+        this._writeQuery.cancel();
+        writeQueryParam(opts.persistParam, '');
+      }
     });
 
     this._results.addEventListener('click', e => {
@@ -596,8 +640,29 @@
       // Take control of scroll restoration away from the browser — its
       // own heuristic can run *after* ours and silently overwrite it,
       // which is the usual cause of "scroll position changes on back".
+      //
+      // IMPORTANT: only do this when we actually have state of our own to
+      // restore (a persisted ?q= query AND a scroll position saved when a
+      // search result was clicked). Setting 'manual' unconditionally
+      // suppresses the browser's native back/forward restore INCLUDING its
+      // jump to the URL's #fragment on history traversal — which broke the
+      // ordinary case of: click an anchor link → follow a normal link to
+      // another page → press Back. With no ?q= and no saved scroll we have
+      // nothing to restore ourselves, so the browser must stay in charge.
+      const hasPersistedQuery  = !!readQueryParam(opts.persistParam);
+      const hasPersistedScroll = !!readScroll(this._scrollKey);
       if ('scrollRestoration' in window.history) {
-        window.history.scrollRestoration = 'manual';
+        if (hasPersistedQuery && hasPersistedScroll) {
+          window.history.scrollRestoration = 'manual';
+        } else {
+          // Scroll-restoration mode is a property of the session history
+          // ENTRY, not the document — if a previous load of this entry set
+          // it to 'manual', that sticks across traversals. Explicitly hand
+          // control back to the browser when we have nothing to restore,
+          // otherwise the original "back lands at top" bug can resurface
+          // on any entry that ever entered manual mode.
+          window.history.scrollRestoration = 'auto';
+        }
       }
 
       this._restoreQueryAndScroll();
@@ -669,7 +734,16 @@
   };
 
   SeekLocateDisplay.prototype._runSearch = function (query) {
-    if (!query.trim()) { this._results.innerHTML = ''; return; }
+    const trimmed = query.trim();
+    // minChars is enforced HERE, not only in the input handler, so that
+    // every path into a search — typing, _restoreQueryAndScroll on
+    // back-navigation, refresh() — applies the same rule. Previously a
+    // persisted 1-character query rendered results after Back that
+    // typing the same character never would have.
+    if (!trimmed || trimmed.length < this._opts.minChars) {
+      this._results.innerHTML = '';
+      return;
+    }
     const parsed = parseQuery(query);
     const results = searchIndex(this._index, parsed, this._opts);
     this._results.innerHTML = renderResults(results, parsed, this._opts);
@@ -698,6 +772,36 @@
     const settleWindowMs = 400; // keep nudging briefly after the first successful apply
     const startedAt = Date.now();
 
+    // ── Abort the moment the user scrolls on their own. Without this,
+    // the poll + settle loop below keeps re-issuing scrollTo() for up
+    // to ~1.9s total, repeatedly yanking the page away from a user who
+    // has already started scrolling somewhere else. Programmatic
+    // scrollTo() doesn't fire wheel/touchmove, so these listeners only
+    // catch genuine user intent. Keydown is filtered to scrolling keys
+    // and ignored while focus is in a form field (typing a space into
+    // the search box must not cancel the restore).
+    let cancelled = false;
+    const SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+    const inFormField = (el) => {
+      if (!el || !el.tagName) return false;
+      const tag = el.tagName.toLowerCase();
+      return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
+    };
+    const cancel = () => {
+      if (cancelled) return;
+      cancelled = true;
+      window.removeEventListener('wheel', onUserScrollIntent);
+      window.removeEventListener('touchmove', onUserScrollIntent);
+      window.removeEventListener('keydown', onUserScrollIntent);
+    };
+    const onUserScrollIntent = (e) => {
+      if (e.type === 'keydown' && (!SCROLL_KEYS.includes(e.key) || inFormField(e.target))) return;
+      cancel();
+    };
+    window.addEventListener('wheel', onUserScrollIntent, { passive: true });
+    window.addEventListener('touchmove', onUserScrollIntent, { passive: true });
+    window.addEventListener('keydown', onUserScrollIntent);
+
     const maxScrollY = () =>
       Math.max(
         document.documentElement.scrollHeight,
@@ -707,6 +811,7 @@
     const apply = () => window.scrollTo(0, targetY);
 
     const poll = () => {
+      if (cancelled) return;
       const elapsed = Date.now() - startedAt;
       const canReachTarget = maxScrollY() >= targetY - 1; // -1 for rounding
 
@@ -716,9 +821,12 @@
         // full height (fonts swapping in, etc.) — nudge a few more times.
         const settleStart = Date.now();
         const nudge = () => {
+          if (cancelled) return;
           apply();
           if (Date.now() - settleStart < settleWindowMs) {
             requestAnimationFrame(nudge);
+          } else {
+            cancel(); // done — remove the abort listeners
           }
         };
         requestAnimationFrame(nudge);
@@ -734,9 +842,13 @@
   SeekLocateDisplay.prototype._navigate = function (url) {
     if (this._opts.persist) {
       saveScroll(this._scrollKey);
-      // Belt-and-suspenders: ensure the search page's own URL reflects
-      // the current input value before we leave, even if something
-      // unusual prevented the input handler's write from running.
+      // Write the search page's URL param synchronously before leaving —
+      // this is what makes the debounced per-keystroke write safe: even
+      // if the user clicks a result inside the debounce window, the URL
+      // gets the final value here. Cancel the pending write first so it
+      // can't fire again afterwards (harmless in most cases, but it
+      // would burn another replaceState call for nothing).
+      this._writeQuery.cancel();
       writeQueryParam(this._opts.persistParam, this._input.value);
     }
     if (typeof this._opts.onNavigate === 'function') {
