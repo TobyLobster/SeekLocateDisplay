@@ -135,7 +135,7 @@ Pass any of these as properties of the options object to `new SeekLocateDisplay(
 | `styles` | `boolean` | `true` | Inject the built-in CSS automatically |
 | `onNavigate` | `function \| null` | `null` | Custom navigation handler `fn(url)`. Defaults to `window.location.href = url` |
 | `persist` | `boolean` | `true` | Persist the search query in the URL and scroll position in `sessionStorage` |
-| `persistParam` | `string` | `'q'` | URL query-string parameter name used to store the search text |
+| `persistParam` | `string` | `'q'` | URL query-string parameter name used to store the search text. Must be unique per instance: if a second instance claims a name already in use on the page, it is given a numeric suffix (`q` → `q2`) and a console warning is logged |
 | `highlightOnNavigate` | `boolean` | `true` | Append the search query to result links so destination pages can highlight matches |
 | `highlightParam` | `string` | `'ls-hl'` | URL query-string parameter name passed to destination pages for highlighting |
 
@@ -150,7 +150,7 @@ The search box supports a simple but powerful query language.
 | `chocolate` | Substring match — finds "chocolate" anywhere, including inside longer words like "chocolatey" |
 | `"chocolate"` | Whole-word match — won't match inside "chocolatey" or "hotchocolate" |
 | `"dark chocolate"` | Exact phrase, whole-word at both ends |
-| `milk chocolate` | AND — both terms must be present in the same section |
+| `milk chocolate` | AND — both terms must be present somewhere in the same section (heading and body text count equally; one term in the heading and the other in the body still matches) |
 | `"milk chocolate" OR "dark"` | OR — either side may match |
 | `cake OR cookie "with nuts"` | OR of two AND-groups |
 
@@ -257,13 +257,13 @@ Re-runs the current search query against the index. Call after `addPage()` or `s
 
 When `persist: true` (the default), SeekLocateDisplay keeps the search experience coherent across navigation:
 
-**Query persistence (URL):** The search text is written to the URL as `?q=...` on every keystroke (not debounced, to avoid a race with clicking results). When the user presses Back, the browser restores the URL, the library reads the parameter, and the search box and results are restored automatically.
+**Query persistence (URL):** The search text is written to the URL as `?q=...` as you type, lightly debounced (~300 ms) to stay well under Safari's rate limit on `history.replaceState`. Clicking a result always writes the final value synchronously before navigating, so the parameter is never missing after Back even if a result is clicked mid-debounce. When the user presses Back, the browser restores the URL, the library reads the parameter, and the search box and results are restored automatically.
 
-**Scroll persistence (`sessionStorage`):** The scroll position is saved at the exact moment the user clicks a result. On return, the library polls until the page is tall enough to accommodate the target scroll position, then restores it. This handles pages where content renders asynchronously.
+**Scroll persistence (`sessionStorage`):** The scroll position is saved at the exact moment the user clicks a result. On return, the library polls until the page is tall enough to accommodate the target scroll position, then restores it. This handles pages where content renders asynchronously. If the user starts scrolling on their own before restoration completes, the restore is abandoned rather than fighting them.
 
 **Back/forward cache (`bfcache`):** The library listens for `pageshow` with `event.persisted === true` to handle browser-level page caching (including a Safari-specific repaint workaround for frozen input fields).
 
-Each SeekLocateDisplay instance scopes its `sessionStorage` key to its container selector, so multiple instances on the same site don't interfere with each other.
+Each SeekLocateDisplay instance keeps its persisted state separate from other instances on the page. The `sessionStorage` scroll key is scoped to the container: the selector string when one was given, otherwise the container element's `id`, otherwise a construction-order index. The URL query parameter is also unique per instance — if two instances are configured with the same `persistParam`, the second gets a numeric suffix (`q` → `q2`) and a console warning. Both fallbacks (the construction-order index and the auto-suffix) are only stable if your instances are created in a deterministic order on every load, so when running multiple search boxes it is best to give each an explicit, distinct `persistParam` — and an `id` on element containers.
 
 ---
 
@@ -285,6 +285,7 @@ To apply your own styles, set `styles: false` and target the classes below:
 | `.ls-stats` | Result count line |
 | `.ls-page` | Per-page result group |
 | `.ls-page-header` | Page group header (title + URL) |
+| `.ls-page-url` | The page URL shown inside the group header |
 | `.ls-hit` | Individual result row |
 | `.ls-hit-title` | Section heading in a result row |
 | `.ls-hit-snippet` | Excerpt text in a result row |
@@ -310,6 +311,7 @@ SeekLocateDisplay targets modern browsers. It uses:
 - `requestAnimationFrame`
 - Unicode property escapes (`/\p{L}/u`) with an ASCII fallback for older engines
 - `document.createTreeWalker` (highlight script)
+- `CSS.escape` (highlight script, with a graceful fallback when unavailable)
 
 No polyfills are required for any evergreen browser (Chrome, Firefox, Safari, Edge).
 

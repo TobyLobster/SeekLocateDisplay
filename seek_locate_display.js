@@ -200,6 +200,55 @@
     return 'seeklocatedisplay:scroll:' + containerSelector;
   }
 
+  /* ── Per-instance isolation ──────────────────────────────────────
+   *
+   * Two things must be unique per instance or instances clobber each
+   * other's state:
+   *
+   *   1. The sessionStorage scroll key. Selector-string containers are
+   *      naturally distinct; element containers previously all fell
+   *      back to one shared '#seeklocatedisplay' key. Element containers
+   *      now use their id when they have one, else a construction-order
+   *      index (stable across loads as long as instances are created in
+   *      a deterministic order — give the element an id if it isn't).
+   *
+   *   2. The URL query param (persistParam). Two instances configured
+   *      with the same param (e.g. both on the default 'q') would write
+   *      over each other and both restore the same text on Back. The
+   *      first instance to claim a param keeps it; later collisions get
+   *      a numeric suffix ('q' → 'q2', 'q3', …) and a console warning
+   *      suggesting an explicit persistParam. Suffixes are assigned in
+   *      construction order, so like the scroll key this is stable for
+   *      deterministic init code — set distinct persistParams explicitly
+   *      if your instances are created in varying order.
+   */
+  let elementInstanceCounter = 0;
+  const claimedPersistParams = new Set();
+
+  function containerKeyFor(container) {
+    if (typeof container === 'string') return container;
+    if (container && container.id) return '#' + container.id;
+    return ':element-' + (++elementInstanceCounter);
+  }
+
+  function claimPersistParam(wanted) {
+    let param = wanted;
+    if (claimedPersistParams.has(param)) {
+      let n = 2;
+      while (claimedPersistParams.has(wanted + n)) n++;
+      param = wanted + n;
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn(
+          'SeekLocateDisplay: persistParam "' + wanted + '" is already used by ' +
+          'another instance on this page; using "' + param + '" instead. ' +
+          'Set a distinct persistParam per instance to avoid this.'
+        );
+      }
+    }
+    claimedPersistParams.add(param);
+    return param;
+  }
+
   function readQueryParam(paramName) {
     try {
       return new URLSearchParams(window.location.search).get(paramName) || '';
@@ -378,41 +427,54 @@
   /* ─── Search ────────────────────────────────────────────────── */
 
   /**
-   * Evaluate one OR-group (AND of terms) against a single field's text.
-   * Returns null if any required term fails to match (AND semantics),
-   * otherwise { score, spans }.
+   * Evaluate one OR-group (AND of terms) against a whole SECTION —
+   * heading and body together. Each term is satisfied by a match in
+   * EITHER field: "milk" in the heading and "chocolate" only in the
+   * body still satisfies the query `milk chocolate`. (An earlier
+   * version AND-ed terms per field, so a section holding both terms
+   * split across heading and body scored zero — surprising, and not
+   * what "both terms must be present in the section" suggests.)
+   *
+   * Returns null if any term matches nowhere in the section (AND
+   * semantics). Otherwise returns a combined score — heading matches
+   * multiplied by headingWeight, exactly as before — plus per-field
+   * span lists for rendering the <mark> highlights.
    */
-  function evalGroupOnField(text, group) {
+  function evalGroupOnSection(entry, group, headingWeight) {
     let score = 0;
-    let spans = [];
+    let hSpans = [];
+    let bSpans = [];
     for (const term of group) {
-      const result = exactScore(text, term.text, term.wholeWord);
-      if (result.spans.length === 0) return null; // AND: this term must match
-      score += result.score;
-      spans = spans.concat(result.spans);
+      const h = exactScore(entry.heading, term.text, term.wholeWord);
+      const b = exactScore(entry.text,    term.text, term.wholeWord);
+      if (h.spans.length === 0 && b.spans.length === 0) {
+        return null; // AND: this term must match somewhere in the section
+      }
+      score += h.score * headingWeight + b.score;
+      hSpans = hSpans.concat(h.spans);
+      bSpans = bSpans.concat(b.spans);
     }
-    return { score, spans };
+    return { score, hSpans, bSpans };
   }
 
-  /** Evaluate all OR-groups against one field; best (highest-score) group wins. */
-  function evalQueryOnField(text, groups) {
+  /** Evaluate all OR-groups against one section; best (highest-score) group wins. */
+  function evalQueryOnSection(entry, groups, headingWeight) {
     let best = null;
     for (const group of groups) {
-      const result = evalGroupOnField(text, group);
+      const result = evalGroupOnSection(entry, group, headingWeight);
       if (result && (!best || result.score > best.score)) best = result;
     }
-    return best || { score: 0, spans: [] };
+    return best;
   }
 
   function searchIndex(entries, parsed, opts) {
     if (parsed.error || !parsed.groups.length) return [];
 
-    const scored = entries.map(e => {
-      const h = evalQueryOnField(e.heading, parsed.groups);
-      const b = evalQueryOnField(e.text,    parsed.groups);
-      const score = h.score * opts.headingWeight + b.score;
-      return { ...e, score, _hSpans: h.spans, _bSpans: b.spans };
-    }).filter(e => e.score > 0);
+    const scored = [];
+    entries.forEach(e => {
+      const r = evalQueryOnSection(e, parsed.groups, opts.headingWeight);
+      if (r) scored.push({ ...e, score: r.score, _hSpans: r.hSpans, _bSpans: r.bSpans });
+    });
 
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, opts.maxResults);
@@ -579,7 +641,15 @@
     this._clearBtn = root.querySelector('.ls-clear');
     this._results  = root.querySelector('.ls-results');
 
-    this._scrollKey = storageKey(typeof opts.container === 'string' ? opts.container : '#seeklocatedisplay');
+    this._scrollKey = storageKey(containerKeyFor(opts.container));
+
+    // Claim a page-unique URL param for query persistence — collisions
+    // between instances get a numeric suffix (see claimPersistParam).
+    // All reads/writes below go through this._persistParam, never the
+    // raw opts value.
+    this._persistParam = opts.persist
+      ? claimPersistParam(opts.persistParam)
+      : opts.persistParam;
 
     const doSearch = debounce((q) => this._runSearch(q), opts.debounceMs);
 
@@ -594,7 +664,7 @@
     // pending write and writes the final value synchronously before
     // leaving the page.
     this._writeQuery = debounce((q) => {
-      if (opts.persist) writeQueryParam(opts.persistParam, q);
+      if (opts.persist) writeQueryParam(this._persistParam, q);
     }, 300);
 
     this._input.addEventListener('input', () => {
@@ -620,7 +690,7 @@
         // debounced write of the just-cleared text could fire ~300ms
         // AFTER we remove the param, resurrecting a stale ?q= value.
         this._writeQuery.cancel();
-        writeQueryParam(opts.persistParam, '');
+        writeQueryParam(this._persistParam, '');
       }
     });
 
@@ -649,7 +719,7 @@
       // ordinary case of: click an anchor link → follow a normal link to
       // another page → press Back. With no ?q= and no saved scroll we have
       // nothing to restore ourselves, so the browser must stay in charge.
-      const hasPersistedQuery  = !!readQueryParam(opts.persistParam);
+      const hasPersistedQuery  = !!readQueryParam(this._persistParam);
       const hasPersistedScroll = !!readScroll(this._scrollKey);
       if ('scrollRestoration' in window.history) {
         if (hasPersistedQuery && hasPersistedScroll) {
@@ -705,7 +775,7 @@
    *   which reliably forces Safari to repaint the field's text.
    */
   SeekLocateDisplay.prototype._restoreQueryAndScroll = function (forceRepaint) {
-    const restoredQuery = readQueryParam(this._opts.persistParam);
+    const restoredQuery = readQueryParam(this._persistParam);
     if (!restoredQuery) return;
 
     const valueChanged = this._input.value !== restoredQuery;
@@ -849,7 +919,7 @@
       // can't fire again afterwards (harmless in most cases, but it
       // would burn another replaceState call for nothing).
       this._writeQuery.cancel();
-      writeQueryParam(this._opts.persistParam, this._input.value);
+      writeQueryParam(this._persistParam, this._input.value);
     }
     if (typeof this._opts.onNavigate === 'function') {
       this._opts.onNavigate(url);
