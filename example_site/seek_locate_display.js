@@ -4,10 +4,10 @@
  * Indexes sections by heading + body text; renders a search UI
  * with results grouped by page and click-to-navigate to anchors.
  *
- * Styles live in the companion stylesheet SeekLocateDisplay.css (they used
- * to be injected from here). Link it in the page <head>, after Colours.css:
- *   <link rel="stylesheet" href="Colours.css">
- *   <link rel="stylesheet" href="SeekLocateDisplay.css">
+ * Styles live in the companion stylesheet sld.css
+ * Link it in the page <head>:
+ *
+ *   <link rel="stylesheet" href="sld.css">
  *
  * Usage:
  *   const sld = new SeekLocateDisplay({

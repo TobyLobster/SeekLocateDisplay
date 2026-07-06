@@ -48,7 +48,7 @@ Press Back and your query, results, and scroll position are restored.
 
 - **Change what's searched:** edit `search-data.js`. Point `url` at your pages,
   and give each section an `id` that exists on the page.
-- **Restyle the box:** edit `SeekLocateDisplay.css`.
+- **Restyle the box:** edit `sld.css`.
 - **Change behaviour:** pass options to the constructor — e.g. `minChars`,
   `maxResults`, `excerptLength`, `placeholder`, `persist`, or an `onNavigate`
   callback. See the comment block at the top of `seek_locate_display.js` for

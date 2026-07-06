@@ -1,6 +1,6 @@
 /* site.css — styling for the demo site itself (NOT the search widget).
 
-   The widget carries its own look in SeekLocateDisplay.css; this file styles
+   The widget carries its own look in sld.css; this file styles
    everything around it: the hero, the reference list, the article pages, and
    the on-arrival highlight. Deliberately left the widget's own .sld-* rules
    alone so you can see the library exactly as it ships.

@@ -8,8 +8,6 @@
 <!-- 1. The widget's own styles.  2. This site's styles. -->
 <link rel="stylesheet" href="sld.css">
 <link rel="stylesheet" href="site.css">
-<script src="search-data.js"></script>
-<script src="seek_locate_display.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -95,7 +93,7 @@
       <p><code>seek_locate_display.js</code> is the library. One <code>new SeekLocateDisplay({…})</code> call builds the box below.</p>
     </li>
     <li>
-      <p><code>SeekLocateDisplay.css</code> styles the box; <code>seek_locate_display_highlight.js</code> on each page marks matches on arrival.</p>
+      <p><code>sld.css</code> styles the box; <code>seek_locate_display_highlight.js</code> on each page marks matches on arrival.</p>
     </li>
   </ol>
 
@@ -108,6 +106,8 @@
 </div>
 
 <!-- Data first, then the library, then a short init. -->
+<script src="search-data.js"></script>
+<script src="seek_locate_display.js"></script>
 <script>
   // The whole integration is this one call.
   var sld = new SeekLocateDisplay({
