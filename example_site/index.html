@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Cocoa Companion — search demo</title>
+
+<!-- 1. The widget's own styles.  2. This site's styles. -->
+<link rel="stylesheet" href="sld.css">
+<link rel="stylesheet" href="site.css">
+<script src="search-data.js"></script>
+<script src="seek_locate_display.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="hero-copy">
+      <p class="kicker">A search demo · SeekLocateDisplay</p>
+      <h1>The Cocoa Companion</h1>
+      <p class="lede">A tiny reference on chocolate — and a live example of local, in-page search.</p>
+    </div>
+    <!-- Signature: a moulded chocolate bar (decorative). -->
+    <div class="bar" aria-hidden="true">
+      <span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span>
+    </div>
+  </header>
+
+  <div class="search-block">
+    <!-- The widget renders itself inside this container. -->
+    <div id="search"></div>
+
+    <div class="try">
+      <span class="try-label">Try</span>
+      <button class="chip" type="button">chocolate</button>
+      <button class="chip" type="button">"chocolate"</button>
+      <button class="chip" type="button">"dark chocolate"</button>
+      <button class="chip" type="button">milk chocolate</button>
+      <button class="chip" type="button">"milk chocolate" OR "dark"</button>
+      <button class="chip" type="button">cake OR cookie "with nuts"</button>
+    </div>
+  </div>
+
+  <div class="section-rule">
+    <h2>In this reference</h2>
+    <span class="line"></span>
+  </div>
+
+  <!-- A plain browsable index. The search reads the same data from
+       search-data.js, so anything listed here is findable above. -->
+  <ul class="contents">
+    <li class="card">
+      <p class="kicker">Varieties</p>
+      <h3><a href="pages/varieties.html">Chocolate Varieties</a></h3>
+      <ul>
+        <li><a href="pages/varieties.html#dark">Dark chocolate</a></li>
+        <li><a href="pages/varieties.html#milk">Milk chocolate</a></li>
+        <li><a href="pages/varieties.html#white">White chocolate</a></li>
+        <li><a href="pages/varieties.html#ruby">Ruby chocolate</a></li>
+      </ul>
+    </li>
+    <li class="card">
+      <p class="kicker">Technique</p>
+      <h3><a href="pages/baking.html">Baking with Chocolate</a></h3>
+      <ul>
+        <li><a href="pages/baking.html#tempering">Tempering</a></li>
+        <li><a href="pages/baking.html#ganache">Ganache</a></li>
+        <li><a href="pages/baking.html#brownies">Brownies</a></li>
+        <li><a href="pages/baking.html#cookies">Cookies</a></li>
+      </ul>
+    </li>
+    <li class="card">
+      <p class="kicker">History</p>
+      <h3><a href="pages/history.html">A Short History of Chocolate</a></h3>
+      <ul>
+        <li><a href="pages/history.html#origins">Mesoamerican origins</a></li>
+        <li><a href="pages/history.html#europe">Arrival in Europe</a></li>
+        <li><a href="pages/history.html#industrial">The industrial bar</a></li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="section-rule">
+    <h2>How it's wired</h2>
+    <span class="line"></span>
+  </div>
+
+  <ol class="wiring">
+    <li>
+      <p><code>search-data.js</code> lists the pages and sections to search. Edit it to change what's indexed.</p>
+    </li>
+    <li>
+      <p><code>seek_locate_display.js</code> is the library. One <code>new SeekLocateDisplay({…})</code> call builds the box below.</p>
+    </li>
+    <li>
+      <p><code>SeekLocateDisplay.css</code> styles the box; <code>seek_locate_display_highlight.js</code> on each page marks matches on arrival.</p>
+    </li>
+  </ol>
+
+  <footer>
+    Search runs entirely in your browser — no server, no build step. Type above, or
+    tap an example. Click a result to jump straight to that section; press Back and
+    your query and place are restored.
+  </footer>
+
+</div>
+
+<!-- Data first, then the library, then a short init. -->
+<script>
+  // The whole integration is this one call.
+  var sld = new SeekLocateDisplay({
+    container: '#search',
+    pages: window.SLD_PAGES,
+    placeholder: 'Search the chocolate reference…',
+    excerptLength: 160
+    // Everything else is left at its defaults:
+    //   persist: true             — keeps ?q= in the URL + scroll on Back
+    //   highlightOnNavigate: true — adds ?sld-hl= so pages can highlight
+    //   onNavigate: null          — plain navigation to the result's URL
+  });
+
+  // The example chips just fill the search box and let the widget react.
+  var input = document.querySelector('#search .sld-input');
+  document.querySelectorAll('.chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      input.value = chip.textContent;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.focus();
+    });
+  });
+</script>
+</body>
+</html>

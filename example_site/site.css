@@ -1,0 +1,373 @@
+/* site.css — styling for the demo site itself (NOT the search widget).
+
+   The widget carries its own look in SeekLocateDisplay.css; this file styles
+   everything around it: the hero, the reference list, the article pages, and
+   the on-arrival highlight. Deliberately left the widget's own .sld-* rules
+   alone so you can see the library exactly as it ships.
+
+   Direction: a chocolatier's reference. Warm cocoa ink on a milk-paper
+   ground, one ruby accent (after ruby chocolate), spec-style monospace
+   labels, and a moulded chocolate-bar block as the one signature flourish. */
+
+:root {
+	--paper:      #fbf8f3;
+	--paper-2:    #f4eee4;   /* recessed panels */
+	--ink:        #29201a;   /* dark-chocolate near-black */
+	--ink-soft:   #6f6157;
+	--edge:       #e8e0d5;
+	--cocoa:      #6b4327;   /* structural brown: rules, labels, the bar */
+	--ruby:       #9e1f3d;   /* the one accent */
+	--ruby-wash:  rgba(158, 31, 61, .14);
+
+	--serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+	--sans:  system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	--mono:  ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+	--measure: 68ch;
+	--pad: clamp(20px, 5vw, 56px);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--paper:     #17120e;
+		--paper-2:   #201812;
+		--ink:       #ece3d8;
+		--ink-soft:  #a99a8b;
+		--edge:      #2e251d;
+		--cocoa:     #c89b6e;
+		--ruby:      #e4788e;
+		--ruby-wash: rgba(228, 120, 142, .18);
+	}
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+	margin: 0;
+	background: var(--paper);
+	color: var(--ink);
+	font-family: var(--sans);
+	font-size: 17px;
+	line-height: 1.65;
+	-webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+	max-width: 1000px;
+	margin: 0 auto;
+	padding: 0 var(--pad);
+}
+
+/* Spec-style label used for eyebrows and section kickers. */
+.kicker {
+	font-family: var(--mono);
+	font-size: 12px;
+	letter-spacing: .16em;
+	text-transform: uppercase;
+	color: var(--cocoa);
+	margin: 0;
+}
+
+a { color: var(--ruby); text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 2px; }
+
+/* ─────────────────────────── Hero ─────────────────────────── */
+
+.hero {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: clamp(24px, 5vw, 56px);
+	align-items: center;
+	padding: clamp(40px, 8vw, 88px) 0 clamp(28px, 5vw, 44px);
+}
+.hero-copy { max-width: 30ch; }
+.hero h1 {
+	font-family: var(--serif);
+	font-weight: 600;
+	font-size: clamp(40px, 8vw, 68px);
+	line-height: 1.02;
+	letter-spacing: -.015em;
+	margin: 14px 0 0;
+}
+.hero .lede {
+	color: var(--ink-soft);
+	font-size: clamp(17px, 2.2vw, 20px);
+	margin: 18px 0 0;
+}
+
+/* Signature: a moulded chocolate bar, four squares by three. */
+.bar {
+	width: clamp(180px, 26vw, 260px);
+	aspect-ratio: 4 / 3;
+	display: grid;
+	grid-template: repeat(3, 1fr) / repeat(4, 1fr);
+	gap: 6px;
+	padding: 12px;
+	border-radius: 12px;
+	background: var(--cocoa);
+	box-shadow: 0 18px 40px -22px rgba(41, 32, 26, .7);
+	transform: rotate(-3deg);
+}
+.bar span {
+	border-radius: 6px 6px 5px 5px;
+	background:
+		linear-gradient(150deg,
+			rgba(255, 255, 255, .22),
+			rgba(255, 255, 255, 0) 42%),
+		linear-gradient(320deg,
+			rgba(0, 0, 0, .28),
+			rgba(0, 0, 0, 0) 46%);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18);
+}
+
+/* ─────────────────────── Search + chips ───────────────────── */
+
+.search-block { padding: 4px 0 8px; }
+#search { margin: 0 0 18px; }
+
+.try {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 8px;
+}
+.try .try-label {
+	font-family: var(--mono);
+	font-size: 12px;
+	letter-spacing: .12em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+	margin-right: 4px;
+}
+.chip {
+	font-family: var(--mono);
+	font-size: 13px;
+	color: var(--ink);
+	background: var(--paper-2);
+	border: 1px solid var(--edge);
+	border-radius: 999px;
+	padding: 5px 12px;
+	cursor: pointer;
+	line-height: 1.3;
+	transition: border-color .12s, background .12s, transform .06s;
+}
+.chip:hover { border-color: var(--cocoa); }
+.chip:active { transform: translateY(1px); }
+.chip:focus-visible {
+	outline: 2px solid var(--ruby);
+	outline-offset: 2px;
+}
+
+/* ───────────────────── Reference contents ─────────────────── */
+
+.section-rule {
+	display: flex;
+	align-items: baseline;
+	gap: 14px;
+	margin: clamp(44px, 7vw, 72px) 0 22px;
+}
+.section-rule h2 {
+	font-family: var(--serif);
+	font-weight: 600;
+	font-size: 24px;
+	margin: 0;
+	white-space: nowrap;
+}
+.section-rule .line {
+	flex: 1;
+	height: 1px;
+	background: var(--edge);
+}
+
+.contents {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	gap: 18px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.card {
+	border: 1px solid var(--edge);
+	border-radius: 12px;
+	padding: 20px 20px 8px;
+	background: var(--paper);
+	transition: border-color .12s, transform .12s;
+}
+.card:hover { border-color: var(--cocoa); transform: translateY(-2px); }
+.card h3 {
+	font-family: var(--serif);
+	font-weight: 600;
+	font-size: 20px;
+	margin: 8px 0 12px;
+}
+.card h3 a { color: var(--ink); text-decoration: none; }
+.card h3 a:hover { color: var(--ruby); }
+.card ul { list-style: none; margin: 0; padding: 0 0 12px; }
+.card li { padding: 4px 0; border-top: 1px solid var(--edge); }
+.card li:first-child { border-top: 0; }
+.card li a { text-decoration: none; }
+.card li a:hover { text-decoration: underline; }
+
+/* ─────────────────────── How it's wired ───────────────────── */
+
+.wiring {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	gap: 20px;
+	margin: 24px 0 0;
+	padding: 0;
+	list-style: none;
+	counter-reset: step;
+}
+.wiring li {
+	counter-increment: step;
+	border-top: 2px solid var(--cocoa);
+	padding: 14px 0 0;
+}
+.wiring li::before {
+	content: counter(step, decimal-leading-zero);
+	font-family: var(--mono);
+	font-size: 12px;
+	color: var(--cocoa);
+	letter-spacing: .1em;
+}
+.wiring code {
+	font-family: var(--mono);
+	font-size: 13px;
+	background: var(--paper-2);
+	border: 1px solid var(--edge);
+	border-radius: 5px;
+	padding: 1px 6px;
+}
+.wiring p { margin: 6px 0 0; color: var(--ink-soft); font-size: 15px; }
+
+/* ───────────────────────── Footer ─────────────────────────── */
+
+footer {
+	margin: clamp(56px, 9vw, 96px) 0 40px;
+	padding-top: 22px;
+	border-top: 1px solid var(--edge);
+	color: var(--ink-soft);
+	font-size: 14px;
+}
+
+/* ═══════════════════ Article (content) pages ══════════════════ */
+
+.topbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 20px 0;
+	border-bottom: 1px solid var(--edge);
+}
+.topbar a.back {
+	font-family: var(--mono);
+	font-size: 13px;
+	letter-spacing: .04em;
+	text-decoration: none;
+}
+.topbar a.back:hover { text-decoration: underline; }
+.topbar .site {
+	font-family: var(--serif);
+	font-size: 17px;
+	color: var(--ink-soft);
+}
+
+article {
+	max-width: var(--measure);
+	margin: 0 auto;
+	padding: clamp(32px, 6vw, 64px) 0 0;
+}
+article > .kicker { margin-bottom: 10px; }
+article h1 {
+	font-family: var(--serif);
+	font-weight: 600;
+	font-size: clamp(34px, 6vw, 52px);
+	line-height: 1.05;
+	letter-spacing: -.015em;
+	margin: 0 0 8px;
+}
+article .intro { color: var(--ink-soft); font-size: 19px; margin: 0 0 8px; }
+
+section {
+	padding: 30px 0;
+	border-top: 1px solid var(--edge);
+	scroll-margin-top: 20px;   /* so the anchor jump clears nothing awkwardly */
+}
+section:first-of-type { border-top: 0; }
+section h2 {
+	font-family: var(--serif);
+	font-weight: 600;
+	font-size: 27px;
+	margin: 0 0 10px;
+	display: flex;
+	align-items: baseline;
+	gap: 12px;
+}
+section h2 .hash {
+	font-family: var(--mono);
+	font-size: 15px;
+	color: var(--cocoa);
+	text-decoration: none;
+	opacity: 0;
+	transition: opacity .12s;
+}
+section h2:hover .hash { opacity: 1; }
+section p { margin: 0 0 14px; }
+
+/* Landed-on section briefly glows so you can see why you're here. */
+section:target { animation: land 1.6s ease-out 1; }
+@keyframes land {
+	0%, 22%   { background: var(--ruby-wash); }
+	100%      { background: transparent; }
+}
+
+/* Matches highlighted on arrival by seek_locate_display_highlight.js.
+   That script injects its own (yellow) default styles; these rules are
+   scoped under .wrap so they out-rank the injected ones by specificity and
+   keep the marks on the site's ruby palette. The single match the page
+   scrolls to also gets the -active class, for a stronger emphasis. */
+.wrap mark.sld-page-highlight {
+	background: var(--ruby-wash);
+	color: inherit;
+	border-radius: 3px;
+	padding: 0 2px;
+}
+.wrap mark.sld-page-highlight-active {
+	background: var(--ruby);
+	color: var(--paper);
+	border-radius: 3px;
+	padding: 0 2px;
+	box-shadow: 0 0 0 2px var(--ruby);
+}
+
+.pager {
+	display: flex;
+	justify-content: space-between;
+	gap: 16px;
+	margin: 20px 0 60px;
+	padding-top: 24px;
+	border-top: 1px solid var(--edge);
+	font-family: var(--mono);
+	font-size: 13px;
+}
+.pager a { text-decoration: none; }
+.pager a:hover { text-decoration: underline; }
+.pager .spacer { color: var(--ink-soft); }
+
+/* ────────────────────── Quality floor ─────────────────────── */
+
+:focus-visible { outline: 2px solid var(--ruby); outline-offset: 2px; }
+
+@media (max-width: 620px) {
+	.hero { grid-template-columns: 1fr; }
+	.bar { justify-self: start; transform: rotate(-3deg) scale(.9); transform-origin: left center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after { animation: none !important; transition: none !important; }
+}

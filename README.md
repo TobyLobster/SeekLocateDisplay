@@ -31,13 +31,18 @@ A zero-dependency, full-text search library for local HTML pages. Drop it into a
 
 ## Installation
 
-Copy `seek_locate_display.js` (and optionally `seek_locate_display_highlight.js`) into your project. No package manager or bundler is required.
+Copy `seek_locate_display.js` and `sld.css` into your project (plus `seek_locate_display_highlight.js` if you want match highlighting on destination pages). No package manager or bundler is required.
+
+Link the stylesheet in your `<head>` and load the script:
 
 ```html
+<link rel="stylesheet" href="sld.css">
 <script src="seek_locate_display.js"></script>
 ```
 
-Or load it as a CommonJS/AMD module:
+The stylesheet is required, not optional: the widget renders its markup with `sld-` classes and takes all of its appearance — including dark mode — from `sld.css`. Without it, the search box is unstyled.
+
+Or load the script as a CommonJS/AMD module:
 
 ```js
 const SeekLocateDisplay = require('./seek_locate_display.js');
@@ -47,9 +52,11 @@ const SeekLocateDisplay = require('./seek_locate_display.js');
 
 ## Quick Start
 
-**1. Add a container element to your search page:**
+**1. Link the stylesheet in your `<head>`, and add a container element to your search page:**
 
 ```html
+<link rel="stylesheet" href="sld.css">
+
 <div id="my-search"></div>
 ```
 
@@ -83,7 +90,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 ```
 
-That's it. The library injects its own styles, renders the search bar, and handles everything from input to navigation.
+That's it. The library renders the search bar — styled by `sld.css` — and handles everything from input to navigation.
 
 ---
 
@@ -132,12 +139,11 @@ Pass any of these as properties of the options object to `new SeekLocateDisplay(
 | `headingWeight` | `number` | `4` | Score multiplier for heading matches vs. body matches |
 | `debounceMs` | `number` | `120` | Milliseconds to wait after the last keystroke before running search |
 | `noResultsText` | `string` | `'No results found.'` | Message shown when the query returns no hits |
-| `styles` | `boolean` | `true` | Inject the built-in CSS automatically |
 | `onNavigate` | `function \| null` | `null` | Custom navigation handler `fn(url)`. Defaults to `window.location.href = url` |
 | `persist` | `boolean` | `true` | Persist the search query in the URL and scroll position in `sessionStorage` |
 | `persistParam` | `string` | `'q'` | URL query-string parameter name used to store the search text. Must be unique per instance: if a second instance claims a name already in use on the page, it is given a numeric suffix (`q` → `q2`) and a console warning is logged |
 | `highlightOnNavigate` | `boolean` | `true` | Append the search query to result links so destination pages can highlight matches |
-| `highlightParam` | `string` | `'ls-hl'` | URL query-string parameter name passed to destination pages for highlighting |
+| `highlightParam` | `string` | `'sld-hl'` | URL query-string parameter name passed to destination pages for highlighting |
 
 ---
 
@@ -162,11 +168,11 @@ Results are ranked by score. Heading matches are weighted more heavily than body
 
 ## Destination Page Highlighting
 
-Include `seek_locate_display_highlight.js` on every page that can appear as a search result. When a user clicks a result, the search query is passed to the destination page via a URL parameter (`?ls-hl=...`). The highlight script then:
+Include `seek_locate_display_highlight.js` on every page that can appear as a search result. When a user clicks a result, the search query is passed to the destination page via a URL parameter (`?sld-hl=...`). The highlight script then:
 
 1. Reads the query from the URL
-2. Walks the page's visible text nodes
-3. Wraps matches in `<mark class="ls-page-highlight">`
+2. Walks the page's text nodes, skipping scripts, styles, form fields, existing marks, and math regions
+3. Wraps matches in `<mark class="sld-page-highlight">`
 4. Scrolls to the first match **within the navigated `#section`** (if present), not just the first match anywhere on the page
 5. Falls back to the section element itself if the section contains no match
 6. Falls back to the first match on the whole page if there is no `#section` anchor
@@ -182,7 +188,7 @@ Include `seek_locate_display_highlight.js` on every page that can appear as a se
 ```html
 <script>
   window.SeekLocateDisplayHighlightOptions = {
-    param: 'ls-hl',
+    param: 'sld-hl',
     scroll: true,
     cleanUrl: true
   };
@@ -190,19 +196,19 @@ Include `seek_locate_display_highlight.js` on every page that can appear as a se
 <script src="seek_locate_display_highlight.js"></script>
 ```
 
-The highlight script uses the same query grammar as the search box, including AND, OR, whole-word quotes, and Unicode-aware word boundary detection.
+The highlight script parses the same query grammar as the search box — whole-word quotes, `AND`, `OR`, and Unicode-aware word boundaries. One nuance: for highlighting it marks every term in the query wherever it appears. The `AND`/`OR` structure decides which *sections* a result belongs to; once you are on the page, each searched term is highlighted regardless of which group it came from.
 
 ### Highlight Script Options
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `param` | `string` | `'ls-hl'` | URL parameter to read the query from |
+| `param` | `string` | `'sld-hl'` | URL parameter to read the query from |
 | `scroll` | `boolean` | `true` | Auto-scroll to the first match |
 | `scrollBehavior` | `string` | `'smooth'` | `scroll()` behaviour — `'smooth'` or `'instant'` |
 | `scrollOffset` | `number` | `80` | Pixel gap above the scrolled-to match (useful for sticky headers) |
 | `cleanUrl` | `boolean` | `false` | Strip the highlight param from the URL after highlighting |
-| `markClassName` | `string` | `'ls-page-highlight'` | CSS class applied to every `<mark>` element |
-| `activeClassName` | `string` | `'ls-page-highlight-active'` | Additional CSS class applied to the first (scrolled-to) `<mark>` |
+| `markClassName` | `string` | `'sld-page-highlight'` | CSS class applied to every `<mark>` element |
+| `activeClassName` | `string` | `'sld-page-highlight-active'` | Additional CSS class applied to the first (scrolled-to) `<mark>` |
 | `skipTags` | `string[]` | `['script', 'style', ...]` | Tag names whose contents are never highlighted |
 | `minTextLength` | `number` | `1` | Minimum text node length to consider for highlighting |
 
@@ -269,35 +275,39 @@ Each SeekLocateDisplay instance keeps its persisted state separate from other in
 
 ## Styling
 
-Built-in styles are injected automatically when `styles: true` (the default). The widget uses BEM-style class names prefixed with `ls-` so they are unlikely to conflict with existing styles.
+All of the widget's appearance comes from `sld.css`. Link it in your page `<head>`:
 
-Full dark mode support is included via `@media (prefers-color-scheme: dark)`.
+```html
+<link rel="stylesheet" href="sld.css">
+```
 
-To apply your own styles, set `styles: false` and target the classes below:
+The widget renders its markup with class names prefixed with `sld-`, so they are unlikely to conflict with existing styles. Full dark mode support is included via `@media (prefers-color-scheme: dark)`.
+
+To restyle it, edit `sld.css` directly or override the classes below from your own stylesheet:
 
 | Class | Element |
 |---|---|
-| `.ls-wrap` | Root container |
-| `.ls-bar` | Search input bar |
-| `.ls-input` | The `<input>` element |
-| `.ls-clear` | Clear button |
-| `.ls-results` | Results list container |
-| `.ls-stats` | Result count line |
-| `.ls-page` | Per-page result group |
-| `.ls-page-header` | Page group header (title + URL) |
-| `.ls-page-url` | The page URL shown inside the group header |
-| `.ls-hit` | Individual result row |
-| `.ls-hit-title` | Section heading in a result row |
-| `.ls-hit-snippet` | Excerpt text in a result row |
-| `.ls-hit-anchor` | Destination URL shown below the snippet |
-| `.ls-empty` | "No results" message |
+| `.sld-wrap` | Root container |
+| `.sld-bar` | Search input bar |
+| `.sld-input` | The `<input>` element |
+| `.sld-clear` | Clear button |
+| `.sld-results` | Results list container |
+| `.sld-stats` | Result count line |
+| `.sld-page` | Per-page result group |
+| `.sld-page-header` | Page group header (title + URL) |
+| `.sld-page-url` | The page URL shown inside the group header |
+| `.sld-hit` | Individual result row |
+| `.sld-hit-title` | Section heading in a result row |
+| `.sld-hit-snippet` | Excerpt text in a result row |
+| `.sld-hit-anchor` | Destination URL shown below the snippet |
+| `.sld-empty` | "No results" message |
 
 Highlight script classes (on destination pages):
 
 | Class | Element |
 |---|---|
-| `mark.ls-page-highlight` | Every highlighted match |
-| `mark.ls-page-highlight-active` | The first (scrolled-to) match |
+| `mark.sld-page-highlight` | Every highlighted match |
+| `mark.sld-page-highlight-active` | The first (scrolled-to) match |
 
 ---
 
