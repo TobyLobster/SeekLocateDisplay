@@ -25,7 +25,9 @@
  *       // text. Matched paragraphs are shown individually in results,
  *       // joined with " | ".
  *       { id: 'overview', heading: 'Overview', text: 'First paragraph…\nSecond paragraph…' },
- *       { id: 'setup',    heading: 'Setup',    text: 'Installation steps…' }
+ *       { id: 'setup',    heading: 'Setup',    text: 'Installation steps…' },
+ *       // 'display' is shown after the heading in results but is NOT searched.
+ *       { id: 'api',      heading: 'API', display: '(v2 only)', text: 'Calls…' }
  *     ]
  *   }
  *
@@ -241,7 +243,9 @@
           url: page.url,
           pageTitle: page.title,
           sectionId: sec.id,
-          heading: sec.heading,
+          heading: sec.heading || '',
+          // Display-only: shown in results but never searched or highlighted.
+          display: sec.display || '',
           text: sec.text || '',
         });
       });
@@ -471,8 +475,22 @@
     return base;
   }
 
-  function renderHeading(heading, spans) {
-    return applySpans(heading, spans || []);
+  /**
+   * Result title: the (searchable, highlighted) heading followed by the
+   * optional display-only text. The display text is never searched, so
+   * it gets no match spans — it is simply escaped and appended.
+   * With a heading, the display text is styled as secondary
+   * (.sld-hit-display); without one, it IS the title and takes the
+   * normal heading style.
+   */
+  function renderHeading(heading, spans, display) {
+    let html = applySpans(heading, spans || []);
+    if (display) {
+      html += heading
+        ? ` <span class="sld-hit-display">${escapeHtml(display)}</span>`
+        : escapeHtml(display);
+    }
+    return html;
   }
 
   /**
@@ -540,10 +558,10 @@
       html += `<div class="sld-page-header">${ICON_FILE}${escapeHtml(g.pageTitle)}<span class="sld-page-url">${escapeHtml(g.url)}</span></div>`;
       g.hits.forEach(hit => {
         const dest = buildDestUrl(hit.url, hit.sectionId, parsed.raw, opts);
-        html += `<div class="sld-hit" role="link" tabindex="0" data-dest="${escapeHtml(dest)}" aria-label="${escapeHtml(hit.heading)} — ${escapeHtml(g.pageTitle)}">
+        html += `<div class="sld-hit" role="link" tabindex="0" data-dest="${escapeHtml(dest)}" aria-label="${escapeHtml([hit.heading, hit.display].filter(Boolean).join(' '))} — ${escapeHtml(g.pageTitle)}">
           ${ICON_HASH}
           <div class="sld-hit-body">
-            <div class="sld-hit-title">${renderHeading(hit.heading, hit._hSpans)}</div>
+            <div class="sld-hit-title">${renderHeading(hit.heading, hit._hSpans, hit.display)}</div>
             <div class="sld-hit-snippet">${renderSnippet(hit.text, hit._bSpans, opts.excerptLength)}</div>
             <span class="sld-hit-anchor">${escapeHtml(dest)}</span>
           </div>

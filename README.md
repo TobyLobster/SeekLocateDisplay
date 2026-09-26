@@ -106,10 +106,17 @@ Each object in the `pages` array describes one HTML page and its searchable sect
     {
       id: 'anchor-id',         // Maps to a URL fragment: page.html#anchor-id
       heading: 'Section Title', // Searchable; weighted more heavily than body text
+      display: '(extra)',       // Optional; shown after the heading, NOT searched
       text: 'Body text…'        // Searchable body content
     }
   ]
 }
+```
+
+**Display-only text:** `display` is shown in the result title immediately after `heading` (styled by `.sld-hit-display`), but it is never searched and never highlighted. Use it for labels such as version tags, dates or category names that shouldn't cause matches. `heading` may be omitted if you only want display text in the title; in that case the display text takes the normal heading style rather than the muted `.sld-hit-display` style.
+
+```js
+{ id: 'api', heading: 'fetchData()', display: '— since v2.1', text: 'Fetches remote data.' }
 ```
 
 **Multi-paragraph sections:** Separate paragraphs with `\n` inside `text`. Each matched paragraph is shown as its own excerpt in the results, joined with ` | `, so users see exactly which part of a long section matched.

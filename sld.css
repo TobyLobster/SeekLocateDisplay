@@ -94,6 +94,7 @@
 	font-size: 14px; font-weight: 600; margin-bottom: 3px; color: #222222;
 	white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.sld-hit-display      { font-weight: 400; color: #888888; }   /* display-only text after the heading (not searched) */
 .sld-hit-snippet      { font-size: 13px; color: #666666; line-height: 1.55; }
 .sld-hit-snippet mark { background: transparent; color: #1a6fc4; font-weight: 600; }   /* highlighted match */
 .sld-sep        { color: #cccccc; font-weight: 400; margin: 0 2px; }   /* the " | " between paragraphs */
@@ -123,6 +124,7 @@
 
 	.sld-hit:hover, .sld-hit:focus { background: #1a2a3a; }
 	.sld-hit-title        { color: #eeeeee; }
+	.sld-hit-display      { color: #aaaaaa; }
 	.sld-hit-snippet      { color: #999999; }
 	.sld-hit-snippet mark { color: #72b3f5; }
 	.sld-sep              { color: #555555; }

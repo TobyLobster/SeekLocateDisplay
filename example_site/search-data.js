@@ -15,6 +15,8 @@
  *         id: 'dark',                   // MUST match an id="..." on that page,
  *                                       // so clicking the result jumps to it
  *         heading: 'Dark chocolate',    // shown as the result title
+ *         display: '· 1500s',           // optional: shown after the heading
+ *                                       // but NOT searched (see History)
  *         text: 'First paragraph…\n'    // \n starts a new paragraph; matched
  *             + 'Second paragraph…'     // paragraphs are shown individually
  *       }
@@ -126,6 +128,7 @@ window.SLD_PAGES = [
       {
         id: 'origins',
         heading: 'Mesoamerican origins',
+        display: '· ancient times',
         text:
           'Cacao was first used in Mesoamerica thousands of years ago. The Maya and '
         + 'later the Aztecs ground the beans into a bitter, frothy drink, often '
@@ -136,6 +139,7 @@ window.SLD_PAGES = [
       {
         id: 'europe',
         heading: 'Arrival in Europe',
+        display: '· 1500s–1700s',
         text:
           'Spanish colonisers brought cacao back to Europe in the sixteenth '
         + 'century, where it was sweetened with sugar and warmed. For a long time '
@@ -145,7 +149,7 @@ window.SLD_PAGES = [
       },
       {
         id: 'industrial',
-        heading: 'The industrial bar',
+        display: 'The industrial bar · 1800s',
         text:
           'In the nineteenth century, new machines turned chocolate from a drink '
         + 'into a bar. A press for removing cocoa butter, the first moulded eating '
